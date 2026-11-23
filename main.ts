@@ -28,6 +28,7 @@ class Fail {
 }
 
 const blank = (s: string): boolean => s.trim() === '';
+const trimSpaces = (s: string): string => s.replace(/^ +/, '').replace(/ +$/, '');
 
 function patchLines(text: string): string[] {
   if (text === '') return [];
@@ -275,7 +276,7 @@ interface USection {
 
 function uPath(raw: string): string | null {
   const tab = raw.indexOf('\t');
-  let p = (tab >= 0 ? raw.slice(0, tab) : raw).trim();
+  let p = trimSpaces(tab >= 0 ? raw.slice(0, tab) : raw);
   if (p === '/dev/null') return null;
   if (p.startsWith('a/') || p.startsWith('b/')) p = p.slice(2);
   return p;
@@ -512,7 +513,7 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
     const kind = sectionStart(line);
     if (kind === null) throw new Exit2(`error: parse ${i + 1}`);
     const headLine = i + 1;
-    const path = line.slice(line.indexOf(': ') + 2).trim();
+    const path = trimSpaces(line.slice(line.indexOf(': ') + 2));
     i++;
     const body: string[] = [];
     while (
@@ -549,7 +550,7 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
       let moveTo: string | null = null;
       let bi = 0;
       if (body.length > 0 && body[0]!.startsWith('*** Move to: ')) {
-        moveTo = body[0]!.slice(13).trim();
+        moveTo = trimSpaces(body[0]!.slice(13));
         bi = 1;
       }
       const chunks: VChunk[] = [];
@@ -562,7 +563,7 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
         const bl = body[bi]!;
         if (bl.startsWith('@@')) {
           pushChunk();
-          const anchor = bl.slice(2).trim();
+          const anchor = trimSpaces(bl.slice(2));
           chunk = { anchor: anchor === '' ? null : anchor, O: [], N: [], eof: false };
         } else if (bl === '*** End of File') {
           if (chunk === null) chunk = { anchor: null, O: [], N: [], eof: false };
@@ -614,13 +615,26 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
             doc.lines.splice(at, 0, ...ch.N.map((n) => n.text));
             cursor = at + ch.N.length;
           } else {
-            const hit = findTier(doc.lines, ch.O, strict, cursor);
-            if (hit === null) throw new Fail('no-match', path);
-            let occ = hit.occ;
-            if (ch.eof) occ = occ.filter((o) => o + ch.O.length === doc.lines.length);
-            if (occ.length === 0) throw new Fail('no-match', path);
-            const pos = occ[0]!;
-            applyReplace(doc, pos, ch.O, ch.N, hit.tier);
+            let pos = -1;
+            let tierUsed = 0;
+            if (ch.eof) {
+              const tiers = strict ? [0] : [0, 1, 2];
+              for (const t of tiers) {
+                const occ = occurrencesAt(doc.lines, ch.O, t, cursor).filter((o) => o + ch.O.length === doc.lines.length);
+                if (occ.length > 0) {
+                  pos = occ[0]!;
+                  tierUsed = t;
+                  break;
+                }
+              }
+              if (pos < 0) throw new Fail('no-match', path);
+            } else {
+              const hit = findTier(doc.lines, ch.O, strict, cursor);
+              if (hit === null) throw new Fail('no-match', path);
+              pos = hit.occ[0]!;
+              tierUsed = hit.tier;
+            }
+            applyReplace(doc, pos, ch.O, ch.N, tierUsed);
             cursor = pos + ch.N.length;
           }
         }
