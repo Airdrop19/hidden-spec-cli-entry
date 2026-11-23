@@ -515,7 +515,11 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
     const path = line.slice(line.indexOf(': ') + 2).trim();
     i++;
     const body: string[] = [];
-    while (i < lines.length && sectionStart(lines[i]!) === null && lines[i]!.trim() !== '*** End Patch') {
+    while (
+      i < lines.length &&
+      sectionStart(lines[i]!) === null &&
+      !(lines[i]!.trim() === '*** End Patch' && !lines[i]!.startsWith(' ') && !lines[i]!.startsWith('-') && !lines[i]!.startsWith('+'))
+    ) {
       body.push(lines[i]!);
       i++;
     }
