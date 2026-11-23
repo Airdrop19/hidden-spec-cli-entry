@@ -329,7 +329,7 @@ function unifiedEdits(lines: string[], strict: boolean): Edit[] {
       let lastCtxPlus = -1;
       body.forEach((bl, bi) => {
         if (bl.startsWith('\\')) {
-          if (bi - 1 === lastCtxPlus) hunk.noFinalBreak = true;
+          if (lastCtxPlus >= 0 && bi - 1 === lastCtxPlus) hunk.noFinalBreak = true;
           if (bi > 0 && body[bi - 1]!.startsWith('+')) cur!.lastPlusNoBreak = true;
           return;
         }
@@ -385,8 +385,8 @@ function unifiedEdits(lines: string[], strict: boolean): Edit[] {
       }
       if (oldPath === null || newPath === null) throw new Fail('missing', oldPath ?? newPath ?? '');
       const isMove = oldPath !== newPath;
-      if (isMove && tree.get(newPath) !== null) throw new Fail('exists', newPath);
       const doc = loadDoc(tree, oldPath);
+      if (isMove && tree.get(newPath) !== null) throw new Fail('exists', newPath);
       let d = 0;
       for (const h of sec.hunks) {
         if (h.O.length === 0) {
@@ -590,8 +590,8 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
       edits.push((tree) => {
         if (!safe(path)) throw new Fail('unsafe', path);
         if (mt !== null && !safe(mt)) throw new Fail('unsafe', mt);
-        if (mt !== null && tree.get(mt) !== null) throw new Fail('exists', mt);
         const doc = loadDoc(tree, path);
+        if (mt !== null && tree.get(mt) !== null) throw new Fail('exists', mt);
         let cursor = 0;
         for (const ch of chunks) {
           if (ch.anchor !== null) {
@@ -636,7 +636,7 @@ function v4aEdits(lines: string[], strict: boolean): Edit[] {
   }
   if (!sawEnd) throw new Exit2(`error: parse ${lines.length + 1}`);
   for (; i < lines.length; i++) {
-    if (!blank(lines[i]!)) throw new Exit2(`error: parse ${i + 1}`);
+    if (!blank(lines[i]!)) throw new Exit2(`error: parse ${lines.length + 1}`);
   }
   return edits;
 }
